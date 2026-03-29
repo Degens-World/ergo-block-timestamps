@@ -46,4 +46,4 @@ python split_by_year.py    # Split master CSV into yearly files
 
 ## Update frequency
 
-Every 6 hours via cron. Can also be triggered manually from the Actions tab.
+Every 1 hour via cron. Can also be triggered manually from the Actions tab.
