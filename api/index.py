@@ -407,7 +407,7 @@ function showExample(key) {
   document.querySelector('[data-ep="' + key + '"]').classList.add('active');
   const ex = examples[key];
   const host = window.location.origin;
-  exPre.innerHTML = '<span class="k">$</span> curl "' + host + ex.curl + '"\n\n' + ex.resp;
+  exPre.innerHTML = '<span class="k">$$</span> curl "' + host + ex.curl + '"\n\n' + ex.resp;
 }
 
 cards.forEach(card => {
