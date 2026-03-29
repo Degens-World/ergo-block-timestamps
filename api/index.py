@@ -262,7 +262,7 @@ HTML = Template("""<!DOCTYPE html>
 </div>
 
 <h3>Example</h3>
-<pre><span class="k">$</span> curl $base_url/api/block/1752521
+<pre><span class="k">$$</span> curl $base_url/api/block/1752521
 
 {
   "height": 1752521,
@@ -270,7 +270,7 @@ HTML = Template("""<!DOCTYPE html>
   "datetime": "2026-03-29T16:15:57.664000"
 }
 
-<span class="k">$</span> curl "$base_url/api/weeks?year=2026&amp;week=14"
+<span class="k">$$</span> curl "$base_url/api/weeks?year=2026&amp;week=14"
 
 {
   "weeks": [{
