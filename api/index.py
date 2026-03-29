@@ -1,12 +1,12 @@
 from http.server import BaseHTTPRequestHandler
-import json
 import sys
 import os
+from string import Template
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from api._utils import load_index
 
-HTML = """<!DOCTYPE html>
+HTML = Template("""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -32,7 +32,7 @@ HTML = """<!DOCTYPE html>
 <p>Free, public API for looking up Ergo blockchain block heights to timestamps. Updated hourly.</p>
 
 <div class="stats">
-  <strong>Dataset:</strong> <span>{total_blocks:,}</span> blocks &mdash; heights {first_height:,} to <span>{latest_height:,}</span>
+  <strong>Dataset:</strong> <span>$total_blocks</span> blocks &mdash; heights $first_height to <span>$latest_height</span>
 </div>
 
 <h2>Endpoints</h2>
@@ -40,33 +40,33 @@ HTML = """<!DOCTYPE html>
 <div class="endpoint">
 <p><span class="method">GET</span> <code>/api/block/:height</code></p>
 <p>Look up a single block by height.</p>
-<pre>curl {base_url}/api/block/1752521
+<pre>curl $base_url/api/block/1752521
 
-{{
+{
   "height": 1752521,
   "timestamp_ms": 1774800957664,
   "datetime": "2026-03-29T16:15:57.664000"
-}}</pre>
+}</pre>
 </div>
 
 <div class="endpoint">
 <p><span class="method">GET</span> <code>/api/blocks?from=X&amp;to=Y</code></p>
 <p>Look up a range of blocks. Maximum 1,000 per request.</p>
-<pre>curl {base_url}/api/blocks?from=1752000&amp;to=1752010
+<pre>curl "$base_url/api/blocks?from=1752000&amp;to=1752010"
 
-{{
+{
   "blocks": [
-    {{"height": 1752000, "timestamp_ms": ..., "datetime": "..."}},
+    {"height": 1752000, "timestamp_ms": ..., "datetime": "..."},
     ...
   ],
   "count": 11
-}}</pre>
+}</pre>
 </div>
 
 <div class="endpoint">
 <p><span class="method">GET</span> <code>/api/info</code></p>
 <p>Get dataset metadata: latest height, total blocks, year boundaries.</p>
-<pre>curl {base_url}/api/info</pre>
+<pre>curl $base_url/api/info</pre>
 </div>
 
 <hr>
@@ -81,19 +81,18 @@ HTML = """<!DOCTYPE html>
   <p>A <a href="https://degens.world">degens.world</a> community tool for the Ergo ecosystem.</p>
 </footer>
 </body>
-</html>"""
+</html>""")
 
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         index = load_index()
         host = self.headers.get('host', 'ergo-block-timestamps.vercel.app')
-        base_url = f"https://{host}"
-        page = HTML.format(
-            total_blocks=index['total_blocks'],
-            first_height=index['first_height'],
-            latest_height=index['latest_height'],
-            base_url=base_url,
+        page = HTML.substitute(
+            total_blocks=f"{index['total_blocks']:,}",
+            first_height=f"{index['first_height']:,}",
+            latest_height=f"{index['latest_height']:,}",
+            base_url=f"https://{host}",
         )
         self.send_response(200)
         self.send_header('Content-Type', 'text/html; charset=utf-8')
