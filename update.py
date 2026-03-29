@@ -28,7 +28,7 @@ def get_current_height() -> int:
     """Get current chain tip from Explorer."""
     resp = requests.get(f"{EXPLORER}/info", timeout=15)
     resp.raise_for_status()
-    return resp.json()["fullHeight"]
+    return resp.json()["height"]
 
 
 def get_blocks_batch(from_height: int, to_height: int) -> list:
