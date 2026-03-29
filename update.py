@@ -31,12 +31,14 @@ def get_current_height() -> int:
     return resp.json()["height"]
 
 
-def get_blocks_batch(from_height: int, to_height: int) -> list:
-    """Fetch a batch of blocks from Explorer."""
+def get_blocks_batch(from_height: int, count: int) -> list:
+    """Fetch a batch of blocks from Explorer using offset pagination.
+    Explorer API: offset = height - 1 (height 1 is at offset 0)."""
+    offset = from_height - 1
     url = (
         f"{EXPLORER}/blocks"
-        f"?fromHeight={from_height}&toHeight={to_height}"
-        f"&limit={BATCH_SIZE}&sortBy=height&sortDirection=asc"
+        f"?offset={offset}&limit={count}"
+        f"&sortBy=height&sortDirection=asc"
     )
     resp = requests.get(url, timeout=30)
     resp.raise_for_status()
@@ -108,12 +110,13 @@ def main():
     errors = 0
     start = time.time()
 
-    for batch_start in range(last_height + 1, current_height + 1, BATCH_SIZE):
-        batch_end = min(batch_start + BATCH_SIZE - 1, current_height)
+    fetch_from = last_height + 1
+    while fetch_from <= current_height:
+        count = min(BATCH_SIZE, current_height - fetch_from + 1)
 
         for attempt in range(3):
             try:
-                items = get_blocks_batch(batch_start, batch_end)
+                items = get_blocks_batch(fetch_from, count)
                 for item in items:
                     h = item.get("height")
                     ts = item.get("timestamp")
@@ -127,13 +130,14 @@ def main():
                         fetched += 1
                 break
             except Exception as e:
-                print(f"  Error {batch_start}-{batch_end} (attempt {attempt+1}): {e}")
+                print(f"  Error at height {fetch_from} (attempt {attempt+1}): {e}")
                 if attempt < 2:
                     time.sleep(3)
                 else:
                     errors += 1
 
-        batch_num = (batch_start - last_height) // BATCH_SIZE
+        fetch_from += count
+        batch_num = (fetch_from - last_height) // BATCH_SIZE
         if batch_num > 0 and batch_num % BURST_EVERY == 0:
             time.sleep(BURST_PAUSE)
         else:
