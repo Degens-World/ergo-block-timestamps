@@ -69,7 +69,7 @@ def main():
     for i, height in enumerate(gaps):
         ts = get_block_timestamp(height)
         if ts:
-            dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+            dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
             rows[height] = {'height': height, 'timestamp_ms': ts, 'datetime': dt}
             filled += 1
         else:

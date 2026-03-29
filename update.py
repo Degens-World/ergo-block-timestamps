@@ -62,7 +62,7 @@ def get_last_height() -> int:
 
 
 def ts_to_dt(ts_ms: int) -> str:
-    return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
 
 
 def get_year_file(year: int) -> str:
