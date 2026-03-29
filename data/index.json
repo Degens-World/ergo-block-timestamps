@@ -1,0 +1,47 @@
+{
+  "years": {
+    "2019": {
+      "min_height": 2,
+      "max_height": 132121,
+      "count": 132120
+    },
+    "2020": {
+      "min_height": 132122,
+      "max_height": 395357,
+      "count": 263236
+    },
+    "2021": {
+      "min_height": 395358,
+      "max_height": 654005,
+      "count": 258648
+    },
+    "2022": {
+      "min_height": 654006,
+      "max_height": 908425,
+      "count": 254420
+    },
+    "2023": {
+      "min_height": 908426,
+      "max_height": 1168207,
+      "count": 259782
+    },
+    "2024": {
+      "min_height": 1168208,
+      "max_height": 1429487,
+      "count": 261280
+    },
+    "2025": {
+      "min_height": 1429488,
+      "max_height": 1689940,
+      "count": 260453
+    },
+    "2026": {
+      "min_height": 1689941,
+      "max_height": 1752578,
+      "count": 62638
+    }
+  },
+  "first_height": 2,
+  "latest_height": 1752578,
+  "total_blocks": 1752577
+}

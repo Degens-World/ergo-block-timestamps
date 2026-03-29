@@ -10,6 +10,7 @@ Usage:
 """
 
 import csv
+import json
 import os
 import requests
 import time
@@ -82,6 +83,47 @@ def append_rows(rows_by_year: dict):
         print(f"  Appended {len(rows):,} rows to {fpath}")
 
 
+def rebuild_json(updated_years):
+    """Rebuild JSON files for updated years and the index."""
+    for year in updated_years:
+        csv_path = get_year_file(year)
+        json_path = os.path.join(DATA_DIR, f"blocks_{year}.json")
+        blocks = {}
+        with open(csv_path, newline='') as f:
+            for row in csv.DictReader(f):
+                blocks[row['height']] = int(row['timestamp_ms'])
+        with open(json_path, 'w') as f:
+            json.dump(blocks, f, separators=(',', ':'))
+        print(f"  Rebuilt {json_path} ({len(blocks):,} blocks)")
+
+    # Rebuild index.json
+    index = {"years": {}}
+    total = 0
+    for fname in sorted(os.listdir(DATA_DIR)):
+        if not fname.startswith("blocks_") or not fname.endswith(".csv"):
+            continue
+        year = fname.replace("blocks_", "").replace(".csv", "")
+        min_h, max_h, count = None, None, 0
+        with open(os.path.join(DATA_DIR, fname), newline='') as f:
+            for row in csv.DictReader(f):
+                h = int(row['height'])
+                if min_h is None or h < min_h:
+                    min_h = h
+                if max_h is None or h > max_h:
+                    max_h = h
+                count += 1
+        index["years"][year] = {"min_height": min_h, "max_height": max_h, "count": count}
+        total += count
+    all_mins = [v["min_height"] for v in index["years"].values()]
+    all_maxs = [v["max_height"] for v in index["years"].values()]
+    index["first_height"] = min(all_mins)
+    index["latest_height"] = max(all_maxs)
+    index["total_blocks"] = total
+    with open(os.path.join(DATA_DIR, "index.json"), 'w') as f:
+        json.dump(index, f, indent=2)
+    print(f"  Rebuilt data/index.json (latest: {index['latest_height']:,})")
+
+
 def main():
     print("=" * 60)
     print("  ERGO BLOCK TIMESTAMPS UPDATE")
@@ -145,6 +187,9 @@ def main():
 
     # Append to yearly files
     append_rows(rows_by_year)
+
+    # Rebuild JSON for updated years + index
+    rebuild_json(rows_by_year.keys())
 
     elapsed = time.time() - start
     print(f"\nDone: {fetched:,} blocks fetched in {elapsed:.1f}s ({errors} errors)")
