@@ -1,0 +1,12 @@
+data/*.csv
+block_timestamps_master.csv
+block_timestamps_master.json
+fill_gaps.py
+split_by_year.py
+compile.py
+check_timestamps.py
+generate_json.py
+update.py
+HANDOFF.md
+files/
+__pycache__/
