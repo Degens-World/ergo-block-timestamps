@@ -134,9 +134,11 @@ HTML = Template("""<!DOCTYPE html>
   .endpoint-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .ep-card {
     background: #0d0d14; padding: 14px 16px; border-radius: 8px;
-    border: 1px solid #1a1a2e; transition: border-color 0.2s;
+    border: 1px solid #1a1a2e; transition: border-color 0.2s, background 0.2s;
+    cursor: pointer; user-select: none;
   }
   .ep-card:hover { border-color: #9d4edd; }
+  .ep-card.active { border-color: #00ff88; background: rgba(0,255,136,0.04); }
   .ep-card p { margin: 0; }
   .ep-card .desc { color: #444; font-size: 0.85em; margin-top: 4px; }
   .method {
@@ -223,11 +225,11 @@ HTML = Template("""<!DOCTYPE html>
 
 <h3>Block Lookups</h3>
 <div class="endpoint-grid">
-  <div class="ep-card">
+  <div class="ep-card active" data-ep="block">
     <p><span class="method">GET</span> <code>/api/block/:height</code></p>
     <p class="desc">single block timestamp</p>
   </div>
-  <div class="ep-card">
+  <div class="ep-card" data-ep="blocks">
     <p><span class="method">GET</span> <code>/api/blocks?from=X&amp;to=Y</code></p>
     <p class="desc">range query, max 1,000</p>
   </div>
@@ -235,19 +237,19 @@ HTML = Template("""<!DOCTYPE html>
 
 <h3>Period Boundaries</h3>
 <div class="endpoint-grid">
-  <div class="ep-card">
+  <div class="ep-card" data-ep="days">
     <p><span class="method">GET</span> <code>/api/days?date=YYYY-MM-DD</code></p>
     <p class="desc">filter: <code>?year=</code> <code>?month=</code></p>
   </div>
-  <div class="ep-card">
+  <div class="ep-card" data-ep="weeks">
     <p><span class="method">GET</span> <code>/api/weeks?year=Y&amp;week=W</code></p>
     <p class="desc">ISO week boundaries</p>
   </div>
-  <div class="ep-card">
+  <div class="ep-card" data-ep="months">
     <p><span class="method">GET</span> <code>/api/months?year=Y&amp;month=M</code></p>
     <p class="desc">calendar month boundaries</p>
   </div>
-  <div class="ep-card">
+  <div class="ep-card" data-ep="years">
     <p><span class="method">GET</span> <code>/api/years?year=Y</code></p>
     <p class="desc">full year boundaries</p>
   </div>
@@ -255,31 +257,14 @@ HTML = Template("""<!DOCTYPE html>
 
 <h3>Metadata</h3>
 <div class="endpoint-grid">
-  <div class="ep-card">
+  <div class="ep-card" data-ep="info">
     <p><span class="method">GET</span> <code>/api/info</code></p>
     <p class="desc">latest height, totals, year index</p>
   </div>
 </div>
 
-<h3>Example</h3>
-<pre><span class="k">$$</span> curl $base_url/api/block/1752521
-
-{
-  "height": 1752521,
-  "timestamp_ms": 1774800957664,
-  "datetime": "2026-03-29T16:15:57.664000"
-}
-
-<span class="k">$$</span> curl "$base_url/api/weeks?year=2026&amp;week=14"
-
-{
-  "weeks": [{
-    "year": 2026, "week": 14, "label": "W14",
-    "block_start": 1747799, "block_end": 1752671,
-    "date_start": "2026-03-23", "date_end": "2026-03-29"
-  }],
-  "count": 1
-}</pre>
+<h3>Example <span style="color:#333; font-size:0.7em; font-weight:400">click an endpoint above</span></h3>
+<pre id="example-code"></pre>
 
 <hr>
 
@@ -381,6 +366,55 @@ async function lookup() {
 
 dp.addEventListener('change', lookup);
 lookup();
+
+// Interactive endpoint examples
+const examples = {
+  block: {
+    curl: '/api/block/1752521',
+    resp: JSON.stringify({"height":1752521,"timestamp_ms":1774800957664,"datetime":"2026-03-29T16:15:57.664000"}, null, 2)
+  },
+  blocks: {
+    curl: '/api/blocks?from=1752000&to=1752005',
+    resp: JSON.stringify({"blocks":[{"height":1752000,"timestamp_ms":1774738527691,"datetime":"2026-03-28T22:55:27.691000"},{"height":1752001,"timestamp_ms":1774738620113,"datetime":"2026-03-28T22:57:00.113000"}],"count":2}, null, 2).replace('}]',"},\n    ...\n  ]")
+  },
+  days: {
+    curl: '/api/days?date=2026-03-29',
+    resp: JSON.stringify({"days":[{"date":"2026-03-29","year":2026,"month":3,"day":29,"block_start":1752068,"block_end":1752671,"count":604}],"count":1}, null, 2)
+  },
+  weeks: {
+    curl: '/api/weeks?year=2026&week=14',
+    resp: JSON.stringify({"weeks":[{"year":2026,"week":14,"label":"W14","block_start":1747799,"block_end":1752671,"date_start":"2026-03-23","date_end":"2026-03-29"}],"count":1}, null, 2)
+  },
+  months: {
+    curl: '/api/months?year=2026&month=3',
+    resp: JSON.stringify({"months":[{"year":2026,"month":3,"name":"March","label":"M03","block_start":1732084,"block_end":1752671,"date_start":"2026-03-01","date_end":"2026-03-29"}],"count":1}, null, 2)
+  },
+  years: {
+    curl: '/api/years?year=2026',
+    resp: JSON.stringify({"years":[{"year":2026,"block_start":1689941,"block_end":1752671,"count":62731,"date_start":"2026-01-01","date_end":"2026-03-29"}],"count":1}, null, 2)
+  },
+  info: {
+    curl: '/api/info',
+    resp: JSON.stringify({"latest_height":1752671,"first_height":2,"total_blocks":1752670,"years":{"2019":{"min_height":2,"max_height":132121,"count":132120},"...":"..."}}, null, 2)
+  }
+};
+
+const exPre = document.getElementById('example-code');
+const cards = document.querySelectorAll('.ep-card[data-ep]');
+
+function showExample(key) {
+  cards.forEach(c => c.classList.remove('active'));
+  document.querySelector('[data-ep="' + key + '"]').classList.add('active');
+  const ex = examples[key];
+  const host = window.location.origin;
+  exPre.innerHTML = '<span class="k">$</span> curl "' + host + ex.curl + '"\n\n' + ex.resp;
+}
+
+cards.forEach(card => {
+  card.addEventListener('click', () => showExample(card.dataset.ep));
+});
+
+showExample('block');
 </script>
 
 </body>
