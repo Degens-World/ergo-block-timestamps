@@ -148,6 +148,24 @@ HTML = Template("""<!DOCTYPE html>
     margin-right: 6px;
   }
 
+  /* Code block with header */
+  .code-block { border-radius: 8px; border: 1px solid #1a1a2e; overflow: hidden; margin-top: 8px; }
+  .code-header {
+    background: #12121c; padding: 10px 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #1a1a2e;
+  }
+  .code-title { font-family: 'JetBrains Mono', monospace; font-size: 0.82em; color: #9d4edd; }
+  .copy-btn {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.75em;
+    background: rgba(0,255,136,0.08); color: #00ff88; border: 1px solid rgba(0,255,136,0.2);
+    padding: 4px 12px; border-radius: 4px; cursor: pointer; transition: all 0.2s;
+  }
+  .copy-btn:hover { background: rgba(0,255,136,0.15); border-color: #00ff88; }
+  .code-block pre { margin: 0; border: none; border-radius: 0; max-height: 400px; overflow-y: auto; }
+  .code-dim { color: #333; }
+  .code-loading { color: #9d4edd; }
+
   hr { border: none; border-top: 1px solid #1a1a2e; margin: 2.5em 0; }
 
   footer {
@@ -264,7 +282,13 @@ HTML = Template("""<!DOCTYPE html>
 </div>
 
 <h3>Example <span style="color:#333; font-size:0.7em; font-weight:400">click an endpoint above</span></h3>
-<pre id="example-code"></pre>
+<div class="code-block">
+  <div class="code-header">
+    <span class="code-title" id="code-title">GET /api/block/1752521</span>
+    <button class="copy-btn" id="copy-btn" onclick="copyCode()">Copy</button>
+  </div>
+  <pre id="example-code"><span class="code-dim">click an endpoint card above...</span></pre>
+</div>
 
 <hr>
 
@@ -367,50 +391,47 @@ async function lookup() {
 dp.addEventListener('change', lookup);
 lookup();
 
-// Interactive endpoint examples — click a card to see its curl + response
-const host = window.location.origin;
-const examples = {
-  block: [
-    host + '/api/block/1752521',
-    '{\n  "height": 1752521,\n  "timestamp_ms": 1774800957664,\n  "datetime": "2026-03-29T16:15:57.664000"\n}'
-  ],
-  blocks: [
-    host + '/api/blocks?from=1752000&to=1752005',
-    '{\n  "blocks": [\n    {"height": 1752000, "timestamp_ms": 1774738527691, "datetime": "..."},\n    {"height": 1752001, "timestamp_ms": 1774738620113, "datetime": "..."},\n    ...\n  ],\n  "count": 6\n}'
-  ],
-  days: [
-    host + '/api/days?date=2026-03-29',
-    '{\n  "days": [{\n    "date": "2026-03-29",\n    "year": 2026, "month": 3, "day": 29,\n    "block_start": 1752068,\n    "block_end": 1752671,\n    "count": 604\n  }],\n  "count": 1\n}'
-  ],
-  weeks: [
-    host + '/api/weeks?year=2026&week=14',
-    '{\n  "weeks": [{\n    "year": 2026, "week": 14, "label": "W14",\n    "block_start": 1747799,\n    "block_end": 1752671,\n    "date_start": "2026-03-23",\n    "date_end": "2026-03-29"\n  }],\n  "count": 1\n}'
-  ],
-  months: [
-    host + '/api/months?year=2026&month=3',
-    '{\n  "months": [{\n    "year": 2026, "month": 3,\n    "name": "March", "label": "M03",\n    "block_start": 1732084,\n    "block_end": 1752671,\n    "date_start": "2026-03-01",\n    "date_end": "2026-03-29"\n  }],\n  "count": 1\n}'
-  ],
-  years: [
-    host + '/api/years?year=2026',
-    '{\n  "years": [{\n    "year": 2026,\n    "block_start": 1689941,\n    "block_end": 1752671,\n    "count": 62731,\n    "date_start": "2026-01-01",\n    "date_end": "2026-03-29"\n  }],\n  "count": 1\n}'
-  ],
-  info: [
-    host + '/api/info',
-    '{\n  "latest_height": 1752671,\n  "first_height": 2,\n  "total_blocks": 1752670,\n  "years": {\n    "2019": {"min_height": 2, "max_height": 132121, "count": 132120},\n    "2020": {"min_height": 132122, "max_height": 395357, ...},\n    ...\n  }\n}'
-  ]
+// Interactive endpoint examples — live fetch
+var endpoints = {
+  block:  '/api/block/1752521',
+  blocks: '/api/blocks?from=1752500&to=1752505',
+  days:   '/api/days?date=2026-03-29',
+  weeks:  '/api/weeks?year=2026&week=13',
+  months: '/api/months?year=2026&month=3',
+  years:  '/api/years?year=2026',
+  info:   '/api/info'
 };
 
-const exPre = document.getElementById('example-code');
-const cards = document.querySelectorAll('.ep-card[data-ep]');
+var exPre = document.getElementById('example-code');
+var codeTitle = document.getElementById('code-title');
+var cards = document.querySelectorAll('.ep-card[data-ep]');
+var lastResponse = '';
+
+function copyCode() {
+  navigator.clipboard.writeText(lastResponse).then(function() {
+    var btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+  });
+}
 
 function showExample(key) {
   cards.forEach(function(c) { c.classList.remove('active'); });
   var card = document.querySelector('[data-ep="' + key + '"]');
   if (card) card.classList.add('active');
-  var ex = examples[key];
-  if (ex && exPre) {
-    exPre.textContent = '  curl "' + ex[0] + '"\n\n' + ex[1];
-  }
+  var path = endpoints[key];
+  codeTitle.textContent = 'GET ' + path;
+  exPre.innerHTML = '<span class="code-loading">fetching...</span>';
+
+  fetch(path)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      lastResponse = JSON.stringify(data, null, 2);
+      exPre.textContent = lastResponse;
+    })
+    .catch(function() {
+      exPre.innerHTML = '<span class="code-dim">request failed</span>';
+    });
 }
 
 cards.forEach(function(card) {
