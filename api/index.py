@@ -122,6 +122,8 @@ HTML = Template("""<!DOCTYPE html>
   }
   .tz-btn:hover { color: #888; }
   .tz-btn.active { background: rgba(0,255,136,0.1); color: #00ff88; }
+  .tz-hint { color: #444; font-size: 1.1em; margin-left: 6px; cursor: help; transition: color 0.2s; }
+  .tz-hint:hover { color: #9d4edd; }
   .time-range { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; color: #888; white-space: nowrap; }
 
   /* Results table */
@@ -233,9 +235,10 @@ HTML = Template("""<!DOCTYPE html>
   <div class="picker-row">
     <label for="datepicker">pick a date</label>
     <input type="date" id="datepicker" min="2019-07-01" value="$today">
-    <div class="tz-toggle">
+    <div class="tz-toggle" title="All API responses return UTC timestamps. Local time is for display only.">
       <button class="tz-btn active" id="tz-utc" onclick="setTZ('UTC')">UTC</button>
       <button class="tz-btn" id="tz-local" onclick="setTZ('local')"></button>
+      <span class="tz-hint" title="All API JSON data is always in UTC. Local time conversion is for display only.">&#9432;</span>
     </div>
   </div>
   <div class="results" id="results">
