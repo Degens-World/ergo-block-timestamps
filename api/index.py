@@ -114,6 +114,15 @@ HTML = Template("""<!DOCTYPE html>
   .picker input[type="date"]:hover { border-color: #9d4edd; }
   .picker input[type="date"]:focus { outline: none; border-color: #00ff88; box-shadow: 0 0 12px rgba(0,255,136,0.15); }
   .picker input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+  .tz-toggle { display: flex; gap: 0; border-radius: 5px; overflow: hidden; border: 1px solid #2a2a3e; margin-left: auto; }
+  .tz-btn {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.78em;
+    background: #12121c; color: #555; border: none; padding: 6px 12px;
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .tz-btn:hover { color: #888; }
+  .tz-btn.active { background: rgba(0,255,136,0.1); color: #00ff88; }
+  .time-range { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; color: #888; white-space: nowrap; }
 
   /* Results table */
   .results { margin-top: 20px; display: none; }
@@ -224,11 +233,15 @@ HTML = Template("""<!DOCTYPE html>
   <div class="picker-row">
     <label for="datepicker">pick a date</label>
     <input type="date" id="datepicker" min="2019-07-01" value="$today">
+    <div class="tz-toggle">
+      <button class="tz-btn active" id="tz-utc" onclick="setTZ('UTC')">UTC</button>
+      <button class="tz-btn" id="tz-local" onclick="setTZ('local')"></button>
+    </div>
   </div>
   <div class="results" id="results">
     <table>
       <thead>
-        <tr><th>Period</th><th>Block Start</th><th>Block End</th><th>Blocks</th></tr>
+        <tr><th>Period</th><th>Block Start</th><th>Block End</th><th>Time Range</th><th>Blocks</th></tr>
       </thead>
       <tbody id="results-body"></tbody>
     </table>
@@ -306,83 +319,145 @@ HTML = Template("""<!DOCTYPE html>
 </footer>
 
 <script>
-const dp = document.getElementById('datepicker');
-const resultsDiv = document.getElementById('results');
-const resultsBody = document.getElementById('results-body');
-const loading = document.getElementById('loading');
+var dp = document.getElementById('datepicker');
+var resultsDiv = document.getElementById('results');
+var resultsBody = document.getElementById('results-body');
+var loading = document.getElementById('loading');
+var currentTZ = 'UTC';
+var localTZName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+var lastLookupData = null;
+
+// Set local TZ button label
+document.getElementById('tz-local').textContent = localTZName.split('/').pop().replace(/_/g, ' ');
 
 function fmt(n) { return n.toLocaleString(); }
 
+function fmtTime(ts_ms, tz) {
+  var d = new Date(ts_ms);
+  var opts = { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz === 'UTC' ? 'UTC' : localTZName };
+  return d.toLocaleTimeString('en-GB', opts);
+}
+
+function fmtDateTime(ts_ms, tz) {
+  var d = new Date(ts_ms);
+  var tzName = tz === 'UTC' ? 'UTC' : localTZName;
+  var opts = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tzName };
+  return d.toLocaleDateString('en-GB', opts);
+}
+
+function setTZ(tz) {
+  currentTZ = tz;
+  document.getElementById('tz-utc').classList.toggle('active', tz === 'UTC');
+  document.getElementById('tz-local').classList.toggle('active', tz === 'local');
+  if (lastLookupData) renderResults(lastLookupData);
+}
+
 function getISOWeek(d) {
-  const date = new Date(d.getTime());
+  var date = new Date(d.getTime());
   date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
+  var yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  var weekNo = Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
   return { year: date.getUTCFullYear(), week: weekNo };
 }
 
+function timeCell(startTs, endTs) {
+  if (!startTs || !endTs) return '<td class="time-range" style="color:#333">-</td>';
+  return '<td class="time-range">' + fmtDateTime(startTs, currentTZ) + ' &rarr; ' + fmtTime(endTs, currentTZ) + '</td>';
+}
+
+function renderResults(data) {
+  var rows = '';
+  for (var i = 0; i < data.length; i++) {
+    var r = data[i];
+    if (r.empty) {
+      rows += '<tr><td class="period">' + r.label + '</td><td colspan="4" style="color:#333">no blocks mined</td></tr>';
+    } else {
+      rows += '<tr><td class="period">' + r.label + '</td>' +
+              '<td class="blocks">' + fmt(r.block_start) + '</td>' +
+              '<td class="blocks">' + fmt(r.block_end) + '</td>' +
+              timeCell(r.ts_start, r.ts_end) +
+              '<td class="count-cell">' + fmt(r.count) + '</td></tr>';
+    }
+  }
+  resultsBody.innerHTML = rows;
+  resultsDiv.style.display = 'block';
+}
+
 async function lookup() {
-  const dateStr = dp.value;
+  var dateStr = dp.value;
   if (!dateStr) return;
 
   loading.style.display = 'block';
   resultsDiv.style.display = 'none';
 
-  const parts = dateStr.split('-');
-  const year = parseInt(parts[0]);
-  const month = parseInt(parts[1]);
-  const d = new Date(dateStr + 'T00:00:00Z');
-  const iso = getISOWeek(d);
+  var parts = dateStr.split('-');
+  var year = parseInt(parts[0]);
+  var month = parseInt(parts[1]);
+  var d = new Date(dateStr + 'T00:00:00Z');
+  var iso = getISOWeek(d);
 
   try {
-    const [dayData, weekData, monthData, yearData] = await Promise.all([
-      fetch('/api/days?date=' + dateStr).then(r => r.json()),
-      fetch('/api/weeks?year=' + iso.year + '&week=' + iso.week).then(r => r.json()),
-      fetch('/api/months?year=' + year + '&month=' + month).then(r => r.json()),
-      fetch('/api/years?year=' + year).then(r => r.json()),
+    var results = await Promise.all([
+      fetch('/api/days?date=' + dateStr).then(function(r) { return r.json(); }),
+      fetch('/api/weeks?year=' + iso.year + '&week=' + iso.week).then(function(r) { return r.json(); }),
+      fetch('/api/months?year=' + year + '&month=' + month).then(function(r) { return r.json(); }),
+      fetch('/api/years?year=' + year).then(function(r) { return r.json(); }),
     ]);
 
-    let rows = '';
+    var dayData = results[0], weekData = results[1], monthData = results[2], yearData = results[3];
+    var data = [];
+
+    // Collect block IDs we need timestamps for
+    var blockIds = [];
 
     if (dayData.days && dayData.days.length > 0) {
-      const dy = dayData.days[0];
-      rows += '<tr><td class="period">' + dateStr + '</td><td class="blocks">' + fmt(dy.block_start) +
-              '</td><td class="blocks">' + fmt(dy.block_end) +
-              '</td><td class="count-cell">' + fmt(dy.count) + '</td></tr>';
+      var dy = dayData.days[0];
+      blockIds.push(dy.block_start, dy.block_end);
+      data.push({ label: dateStr, block_start: dy.block_start, block_end: dy.block_end, count: dy.count, ts_start: null, ts_end: null });
     } else {
-      rows += '<tr><td class="period">' + dateStr + '</td><td colspan="3" style="color:#333">no blocks mined</td></tr>';
+      data.push({ label: dateStr, empty: true });
     }
 
     if (weekData.weeks && weekData.weeks.length > 0) {
-      const wk = weekData.weeks[0];
-      const cnt = wk.block_end - wk.block_start + 1;
-      rows += '<tr><td class="period">Week ' + wk.label + ' / ' + iso.year +
-              '</td><td class="blocks">' + fmt(wk.block_start) +
-              '</td><td class="blocks">' + fmt(wk.block_end) +
-              '</td><td class="count-cell">' + fmt(cnt) + '</td></tr>';
+      var wk = weekData.weeks[0];
+      blockIds.push(wk.block_start, wk.block_end);
+      data.push({ label: 'Week ' + wk.label + ' / ' + iso.year, block_start: wk.block_start, block_end: wk.block_end, count: wk.block_end - wk.block_start + 1, ts_start: null, ts_end: null });
     }
 
     if (monthData.months && monthData.months.length > 0) {
-      const mo = monthData.months[0];
-      const cnt = mo.block_end - mo.block_start + 1;
-      rows += '<tr><td class="period">' + mo.name + ' ' + year +
-              '</td><td class="blocks">' + fmt(mo.block_start) +
-              '</td><td class="blocks">' + fmt(mo.block_end) +
-              '</td><td class="count-cell">' + fmt(cnt) + '</td></tr>';
+      var mo = monthData.months[0];
+      blockIds.push(mo.block_start, mo.block_end);
+      data.push({ label: mo.name + ' ' + year, block_start: mo.block_start, block_end: mo.block_end, count: mo.block_end - mo.block_start + 1, ts_start: null, ts_end: null });
     }
 
     if (yearData.years && yearData.years.length > 0) {
-      const yr = yearData.years[0];
-      rows += '<tr><td class="period">Year ' + year +
-              '</td><td class="blocks">' + fmt(yr.block_start) +
-              '</td><td class="blocks">' + fmt(yr.block_end) +
-              '</td><td class="count-cell">' + fmt(yr.count) + '</td></tr>';
+      var yr = yearData.years[0];
+      blockIds.push(yr.block_start, yr.block_end);
+      data.push({ label: 'Year ' + year, block_start: yr.block_start, block_end: yr.block_end, count: yr.count, ts_start: null, ts_end: null });
     }
 
-    resultsBody.innerHTML = rows;
-    resultsDiv.style.display = 'block';
+    // Fetch timestamps for boundary blocks (deduplicated)
+    var unique = Array.from(new Set(blockIds));
+    var tsMap = {};
+    var tsResults = await Promise.all(unique.map(function(h) {
+      return fetch('/api/block/' + h).then(function(r) { return r.json(); });
+    }));
+    for (var i = 0; i < unique.length; i++) {
+      tsMap[unique[i]] = tsResults[i].timestamp_ms;
+    }
+
+    // Fill in timestamps
+    for (var j = 0; j < data.length; j++) {
+      if (!data[j].empty) {
+        data[j].ts_start = tsMap[data[j].block_start];
+        data[j].ts_end = tsMap[data[j].block_end];
+      }
+    }
+
+    lastLookupData = data;
+    renderResults(data);
   } catch (e) {
-    resultsBody.innerHTML = '<tr><td colspan="4" style="color:#ff4444">rekt. try again.</td></tr>';
+    resultsBody.innerHTML = '<tr><td colspan="5" style="color:#ff4444">rekt. try again.</td></tr>';
     resultsDiv.style.display = 'block';
   }
   loading.style.display = 'none';
