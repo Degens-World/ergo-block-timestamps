@@ -473,7 +473,7 @@ lookup();
 var endpoints = {
   block:  '/api/block/1752521',
   blocks: '/api/blocks?from=1752500&to=1752505',
-  days:   '/api/days?date=2026-03-29',
+  days:   '/api/days?year=2026&month=3',
   weeks:  '/api/weeks?year=2026&week=13',
   months: '/api/months?year=2026&month=3',
   years:  '/api/years?year=2026',
