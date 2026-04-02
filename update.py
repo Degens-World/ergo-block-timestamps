@@ -23,13 +23,29 @@ BATCH_SIZE = 50   # Explorer API max per request
 DELAY = 0.2       # seconds between requests
 BURST_EVERY = 10  # pause longer every N batches
 BURST_PAUSE = 1.0 # seconds for burst pause
+MAX_RETRIES = 4   # retries for API calls
+RETRY_BACKOFF = [2, 5, 10, 20]  # seconds between retries
+
+
+def api_get(url: str, timeout: int = 30) -> dict:
+    """GET with retry + exponential backoff."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = requests.get(url, timeout=timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except (requests.exceptions.RequestException) as e:
+            if attempt < MAX_RETRIES - 1:
+                wait = RETRY_BACKOFF[attempt]
+                print(f"  Retry {attempt+1}/{MAX_RETRIES} after {wait}s: {e}")
+                time.sleep(wait)
+            else:
+                raise
 
 
 def get_current_height() -> int:
     """Get current chain tip from Explorer."""
-    resp = requests.get(f"{EXPLORER}/info", timeout=15)
-    resp.raise_for_status()
-    return resp.json()["height"]
+    return api_get(f"{EXPLORER}/info", timeout=15)["height"]
 
 
 def get_blocks_batch(from_height: int, count: int) -> list:
@@ -41,9 +57,7 @@ def get_blocks_batch(from_height: int, count: int) -> list:
         f"?offset={offset}&limit={count}"
         f"&sortBy=height&sortDirection=asc"
     )
-    resp = requests.get(url, timeout=30)
-    resp.raise_for_status()
-    return resp.json().get("items", [])
+    return api_get(url, timeout=30).get("items", [])
 
 
 def get_last_height() -> int:
@@ -280,27 +294,22 @@ def main():
     while fetch_from <= current_height:
         count = min(BATCH_SIZE, current_height - fetch_from + 1)
 
-        for attempt in range(3):
-            try:
-                items = get_blocks_batch(fetch_from, count)
-                for item in items:
-                    h = item.get("height")
-                    ts = item.get("timestamp")
-                    if h and ts:
-                        year = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).year
-                        rows_by_year[year].append({
-                            'height': h,
-                            'timestamp_ms': ts,
-                            'datetime': ts_to_dt(ts)
-                        })
-                        fetched += 1
-                break
-            except Exception as e:
-                print(f"  Error at height {fetch_from} (attempt {attempt+1}): {e}")
-                if attempt < 2:
-                    time.sleep(3)
-                else:
-                    errors += 1
+        try:
+            items = get_blocks_batch(fetch_from, count)
+            for item in items:
+                h = item.get("height")
+                ts = item.get("timestamp")
+                if h and ts:
+                    year = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).year
+                    rows_by_year[year].append({
+                        'height': h,
+                        'timestamp_ms': ts,
+                        'datetime': ts_to_dt(ts)
+                    })
+                    fetched += 1
+        except Exception as e:
+            print(f"  Failed at height {fetch_from} after {MAX_RETRIES} retries: {e}")
+            errors += 1
 
         fetch_from += count
         batch_num = (fetch_from - last_height) // BATCH_SIZE
