@@ -37,11 +37,11 @@
     },
     "2026": {
       "min_height": 1689941,
-      "max_height": 1856122,
-      "count": 166182
+      "max_height": 1856173,
+      "count": 166233
     }
   },
   "first_height": 2,
-  "latest_height": 1856122,
-  "total_blocks": 1856121
+  "latest_height": 1856173,
+  "total_blocks": 1856172
 }
